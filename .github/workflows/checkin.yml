@@ -11,6 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: 执行签到
-        uses: rakuyoMo/autocheck-anyrouter@v1
+        uses: rakuyoMo/autocheck-anyrouter@v1.4.1
         with:
-          accounts: ${{ secrets.ANYROUTER_ACCOUNTS }}
+          accounts: \${{ secrets.ANYROUTER_ACCOUNTS }}
