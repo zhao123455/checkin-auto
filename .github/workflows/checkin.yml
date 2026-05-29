@@ -11,61 +11,68 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 设置 Python
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: 'latest'
+
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: 安装依赖
         run: |
-          pip install httpx httpx-socks PySocks cryptg
+          uv pip install --system httpx beautifulsoup4 lxml
 
-      - name: 执行签到
+      - name: 签到
         env:
-          ACCOUNTS: ${{ secrets.ANYROUTER_ACCOUNTS }}
+          ACCOUNTS_JSON: ${{ secrets.ANYROUTER_ACCOUNTS }}
         run: |
-          python3 -c "
-import json, os, hmac, hashlib, time, urllib.request
+          python3 << 'PYEOF'
+import json, os, hmac, hashlib, time, urllib.request, urllib.error
 
-accounts = json.loads(os.environ['ACCOUNTS'])
+accounts = json.loads(os.environ['ACCOUNTS_JSON'])
 
 for acct in accounts:
     sess = acct['cookies']['session']
     uid = acct['api_user']
-    print(f'=== 签到: {uid} ===')
+    print(f'=== 签到 {uid} ===')
 
-    # 尝试直接签到
+    headers = {
+        'Cookie': f'session={sess}',
+        'New-Api-User': str(uid),
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        'Origin': 'https://anyrouter.top',
+        'Referer': 'https://anyrouter.top/',
+        'X-Requested-With': 'XMLHttpRequest',
+    }
+
     req = urllib.request.Request(
         'https://anyrouter.top/api/user/sign_in',
-        data=b'{}',
-        headers={
-            'Cookie': f'session={sess}',
-            'New-Api-User': str(uid),
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (compatible; AnyRouter-Checkin/1.0)',
-            'Accept': 'application/json',
-            'Origin': 'https://anyrouter.top',
-            'Referer': 'https://anyrouter.top/',
-        }
+        data=b'{}
+',
+        headers=headers,
     )
 
     try:
-        resp = urllib.request.urlopen(req, timeout=15)
-        body = resp.read().decode()
+        resp = urllib.request.urlopen(req, timeout=30)
+        body = resp.read().decode('utf-8', errors='ignore')
         print(f'HTTP {resp.status}: {body[:200]}')
-
         if 'success' in body and 'true' in body:
-            print('✅ 签到成功')
+            print('✅ 签到成功!')
         elif '已签到' in body:
-            print('ℹ️ 今天已签到过')
+            print('ℹ️ 今天已签到过了')
         else:
             print(f'⚠️ 响应: {body[:300]}')
     except urllib.error.HTTPError as e:
-        err_body = e.read().decode()[:200]
-        print(f'❌ HTTP {e.code}: {err_body}')
-        # Try with extra headers if WAF blocked
-        if e.code in (403, 503) or 'acw' in err_body:
-            print('  可能被 WAF 阻挡，尝试备用方式...')
+        err = e.read().decode('utf-8', errors='ignore')[:200]
+        print(f'HTTP {e.code}: {err}')
+        if e.code == 401:
+            print('❌ Session 过期，请重新获取')
+        else:
+            print(f'其他错误')
     except Exception as e:
-        print(f'❌ 错误: {e}')
-"
+        print(f'错误: {e}')
+PYEOF
