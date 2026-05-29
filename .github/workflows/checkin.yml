@@ -1,0 +1,16 @@
+name: AnyRouter 自动签到
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: 执行签到
+        uses: rakuyoMo/autocheck-anyrouter@v1
+        with:
+          accounts: ${{ secrets.ANYROUTER_ACCOUNTS }}
