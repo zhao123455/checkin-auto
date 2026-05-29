@@ -9,8 +9,23 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
-      - name: 执行签到
-        uses: rakuyoMo/autocheck-anyrouter@v1.4.1
-        with:
-          accounts: ${{ secrets.ANYROUTER_ACCOUNTS }}
+      - name: 签到 AnyRouter
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://anyrouter.top/api/user/sign_in"             -H "Cookie: session=${{ secrets.ANYROUTER_SESSION }}"             -H "New-Api-User: ${{ secrets.ANYROUTER_USER }}"             -H "Content-Type: application/json"             -d '{}')
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed -n '1,/^[0-9]\{3\}$/p' | head -n -1)
+          
+          echo "HTTP: $HTTP_CODE"
+          echo "Response: $BODY"
+          
+          if echo "$BODY" | grep -q '"success":true'; then
+            echo "✅ 签到成功"
+          elif echo "$BODY" | grep -q '已签到'; then
+            echo "ℹ️ 今天已签到过"
+          elif [ "$HTTP_CODE" = "200" ]; then
+            echo "⚠️ 可能需要检查响应"
+          else
+            echo "❌ 签到失败"
+            exit 1
+          fi
